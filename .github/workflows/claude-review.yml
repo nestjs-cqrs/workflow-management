@@ -1,0 +1,32 @@
+name: Claude Code Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  review:
+    if: >
+      (github.event_name == 'pull_request') ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+    steps:
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          direct_prompt: |
+            Review this PR against the project rules in .claude/rules/ and CLAUDE.md.
+
+            Check for:
+            1. Violations of any NEVER rules defined in .claude/rules/
+            2. Patterns that contradict established conventions
+            3. Missing validation, missing Result<T> usage, raw entity returns, etc.
+            4. If .claude/rules/ files are being modified, verify alignment with engineering ADRs at https://github.com/nestjs-cqrs/engineering-adrs
+
+            Be specific — quote the rule being violated and the line of code.
