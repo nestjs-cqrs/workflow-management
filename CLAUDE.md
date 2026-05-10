@@ -1,4 +1,4 @@
-# AutoFlux
+# {{PROJECT_NAME}}
 
 ## Stack
 
