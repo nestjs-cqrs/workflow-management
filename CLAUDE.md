@@ -1,51 +1,29 @@
-# {{PROJECT_NAME}}
+# Workflow Management
 
 ## Stack
 
-- **Backend:** NestJS (modular monolith), CQRS with pipeline behaviors, TypeORM, PostgreSQL, Redis, Keycloak BFF auth
-- **Frontend:** React, Vite, TanStack Query, Zustand, React Hook Form + Zod, Tailwind CSS, shadcn/ui
-- **Infrastructure:** Docker Compose (local dev), Kubernetes + Helm + ArgoCD (production)
+- **Backend:** NestJS, CQRS with pipeline behaviors, TypeORM, PostgreSQL, Kogito integration
+- **Infrastructure:** Docker Compose (local dev)
 
 ## Architecture
 
-**Modular monolith.** One backend Docker image, one frontend Docker image. Modules communicate via CommandBus/QueryBus. Each module owns its own PostgreSQL schema.
+Generic workflow management service. Provides approval/rejection/cancellation APIs for Kogito-orchestrated workflows. Business apps (AutoFlux, etc.) start workflows via `@Workflow` decorator — this app manages the human interaction side.
 
-**CQRS.** Every operation is a Command/Query class + Handler. Controllers are thin — they only parse requests and dispatch to the bus.
-
-**BFF Authentication.** Tokens stored server-side in Redis. Browser gets httpOnly cookies only. No tokens in localStorage/sessionStorage ever.
+Connects to the same PostgreSQL database as business apps to read `WorkflowInstance` records created by the `@turkelk/nestjs-cqrs-workflow` framework.
 
 ## Dev Workflow
 
 ```bash
-# Start backend + infrastructure
-docker compose up
-
-# Start frontend (separate terminal)
-cd client && npm run dev
-
-# Browser
-open http://localhost:5173
+npm run start:dev
+# API: http://localhost:3001
+# Swagger: http://localhost:3001/api/docs
 ```
-
-**Ports:** 5173 (frontend/Vite), 3000 (backend API), 8080 (Keycloak)
 
 ## Key Conventions
 
-- Database columns are **camelCase** (TypeORM default naming strategy)
 - Handlers return `Result<T>` — never throw for business errors
-- Validation: DTOs use class-validator, Commands use Zod via `@Validate`
-- Entities extend `BaseEntity` from the shared kernel
-- Generate migrations from entities: `npx typeorm migration:generate src/migrations/Name`
-
-## Test Commands
-
-```bash
-# Backend unit + integration tests
-npm test
-
-# Frontend tests
-cd client && npm test
-
-# E2E tests
-cd client && npx playwright test
-```
+- Database columns are camelCase
+- Publishes CloudEvents to Kogito for approval decisions
+- Controllers are thin — dispatch to CommandBus/QueryBus only
+- DTOs use class-validator decorators + @ApiProperty for Swagger
+- Structured logging via Pino (no console.log)
