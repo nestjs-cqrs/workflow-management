@@ -15,7 +15,6 @@ export class RejectTaskHandler implements ICommandHandler<RejectTaskCommand> {
   ) {}
 
   async execute(command: RejectTaskCommand): Promise<Result<void>> {
-    // Verify the instance exists and is active in Kogito
     let instance;
     try {
       instance = await this.kogitoApi.getInstance(
@@ -34,12 +33,28 @@ export class RejectTaskHandler implements ICommandHandler<RejectTaskCommand> {
       );
     }
 
+    const activeNodes = instance.nodes?.filter((n: { exit?: string }) => !n.exit) ?? [];
+    const waitingNode = activeNodes.find((n: { name: string }) =>
+      n.name.startsWith('WaitApproval'),
+    );
+
+    if (!waitingNode) {
+      return Result.conflict('No pending approval found for this workflow instance');
+    }
+
+    const requiredRole = waitingNode.name.split('_').pop()?.toLowerCase();
+    if (!requiredRole || !command.userRoles.includes(requiredRole)) {
+      return Result.forbidden(
+        `Role '${requiredRole}' is required to reject this step`,
+      );
+    }
+
     await this.kogitoEventService.publishApprovalDecision(
       command.processInstanceId,
       {
         approved: false,
-        approvedById: command.rejectedById,
-        role: command.role,
+        approvedById: command.userId,
+        role: requiredRole,
         feedback: command.feedback,
       },
     );
@@ -48,8 +63,8 @@ export class RejectTaskHandler implements ICommandHandler<RejectTaskCommand> {
       msg: 'Task rejected',
       processInstanceId: command.processInstanceId,
       processId: command.processId,
-      rejectedById: command.rejectedById,
-      role: command.role,
+      userId: command.userId,
+      requiredRole,
     });
 
     return Result.success(undefined);

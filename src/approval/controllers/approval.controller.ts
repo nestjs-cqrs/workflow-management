@@ -13,6 +13,10 @@ import { GetPendingTasksQuery } from '../queries/get-pending-tasks.query';
 import { ApproveTaskDto } from '../dtos/approve-task.dto';
 import { RejectTaskDto } from '../dtos/reject-task.dto';
 import { PendingTaskResponseDto } from '../dtos/pending-task-response.dto';
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from '../../bff/decorators/current-user.decorator';
 
 @ApiTags('approvals')
 @Controller('api/approvals')
@@ -23,15 +27,18 @@ export class ApprovalController {
   ) {}
 
   @Get('pending')
-  @ApiOperation({ summary: 'List pending approval tasks' })
+  @ApiOperation({ summary: 'List pending approval tasks for the current user' })
   @ApiQuery({
     name: 'app',
     required: false,
     description: 'Filter by process definition ID',
   })
   @ApiResponse({ status: 200, type: [PendingTaskResponseDto] })
-  getPendingTasks(@Query('app') app?: string) {
-    return this.queryBus.execute(new GetPendingTasksQuery(app));
+  getPendingTasks(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('app') app?: string,
+  ) {
+    return this.queryBus.execute(new GetPendingTasksQuery(user.roles, app));
   }
 
   @Post(':processInstanceId/approve')
@@ -41,21 +48,23 @@ export class ApprovalController {
     description: 'Kogito process instance ID',
   })
   @ApiResponse({ status: 200, description: 'Task approved successfully' })
+  @ApiResponse({ status: 403, description: 'User does not have the required role' })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
   @ApiResponse({
     status: 409,
-    description: 'Workflow instance is not in an active state',
+    description: 'No pending approval or workflow not active',
   })
   approveTask(
     @Param('processInstanceId') processInstanceId: string,
     @Body() dto: ApproveTaskDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.commandBus.execute(
       new ApproveTaskCommand(
         processInstanceId,
         dto.processId,
-        dto.approvedById,
-        dto.role,
+        user.keycloakId,
+        user.roles,
         dto.comment,
       ),
     );
@@ -68,21 +77,23 @@ export class ApprovalController {
     description: 'Kogito process instance ID',
   })
   @ApiResponse({ status: 200, description: 'Task rejected successfully' })
+  @ApiResponse({ status: 403, description: 'User does not have the required role' })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
   @ApiResponse({
     status: 409,
-    description: 'Workflow instance is not in an active state',
+    description: 'No pending approval or workflow not active',
   })
   rejectTask(
     @Param('processInstanceId') processInstanceId: string,
     @Body() dto: RejectTaskDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.commandBus.execute(
       new RejectTaskCommand(
         processInstanceId,
         dto.processId,
-        dto.rejectedById,
-        dto.role,
+        user.keycloakId,
+        user.roles,
         dto.feedback,
       ),
     );

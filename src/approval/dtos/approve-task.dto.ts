@@ -7,16 +7,6 @@ export class ApproveTaskDto {
   @IsNotEmpty()
   processId!: string;
 
-  @ApiProperty({ description: 'ID of the user approving the task' })
-  @IsString()
-  @IsNotEmpty()
-  approvedById!: string;
-
-  @ApiProperty({ description: 'Role of the approving user' })
-  @IsString()
-  @IsNotEmpty()
-  role!: string;
-
   @ApiProperty({
     description: 'Optional comment for the approval',
     required: false,

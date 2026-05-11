@@ -1,3 +1,6 @@
 export class GetPendingTasksQuery {
-  constructor(public readonly app?: string) {}
+  constructor(
+    public readonly userRoles: string[],
+    public readonly app?: string,
+  ) {}
 }

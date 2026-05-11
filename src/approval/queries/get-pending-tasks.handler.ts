@@ -16,7 +16,6 @@ export class GetPendingTasksHandler
     let instances;
 
     if (query.app) {
-      // Filter by specific process definition ID
       const processInstances = await this.kogitoApi.listInstances(query.app);
       instances = processInstances.filter((i) => i.state === 1);
     } else {
@@ -26,26 +25,30 @@ export class GetPendingTasksHandler
     const tasks: PendingTaskResponseDto[] = [];
 
     for (const instance of instances) {
-      // Get detailed info including current node/state
       const detail = await this.kogitoApi.getInstance(
         instance.processId,
         instance.id,
       );
 
-      // Find the currently active node — this tells us which step/role is pending
-      const activeNodes = detail.nodes?.filter((n) => !n.exit) ?? [];
-      const waitingNode = activeNodes.find((n) =>
+      const activeNodes = detail.nodes?.filter((n: { exit?: string }) => !n.exit) ?? [];
+      const waitingNode = activeNodes.find((n: { name: string }) =>
         n.name.startsWith('WaitApproval'),
       );
 
       if (waitingNode) {
-        tasks.push({
-          processInstanceId: instance.id,
-          processId: instance.processId,
-          currentState: waitingNode.name,
-          variables: detail.variables ?? {},
-          startedAt: instance.start ?? '',
-        });
+        const requiredRole =
+          waitingNode.name.split('_').pop()?.toLowerCase() ?? '';
+
+        if (query.userRoles.includes(requiredRole)) {
+          tasks.push({
+            processInstanceId: instance.id,
+            processId: instance.processId,
+            currentState: waitingNode.name,
+            requiredRole,
+            variables: detail.variables ?? {},
+            startedAt: instance.start ?? '',
+          });
+        }
       }
     }
 

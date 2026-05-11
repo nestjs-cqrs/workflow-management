@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 import {
   ApiTags,
   ApiOperation,
@@ -15,13 +15,12 @@ import { GetWorkflowInstanceQuery } from '../queries/get-workflow-instance.query
 import { GetPendingTasksQuery } from '../queries/get-pending-tasks.query';
 import { WorkflowInstanceResponseDto } from '../dtos/workflow-instance-response.dto';
 import { PendingTaskResponseDto } from '../dtos/pending-task-response.dto';
+import {
+  CurrentUser,
+  AuthenticatedUser,
+} from '../../bff/decorators/current-user.decorator';
 
 class CancelWorkflowDto {
-  @ApiProperty({ description: 'ID of the user cancelling the workflow' })
-  @IsString()
-  @IsNotEmpty()
-  cancelledById!: string;
-
   @ApiProperty({ description: 'Reason for cancellation', required: false })
   @IsString()
   @IsOptional()
@@ -44,8 +43,11 @@ export class WorkflowController {
     description: 'Filter by process definition ID',
   })
   @ApiResponse({ status: 200, type: [PendingTaskResponseDto] })
-  listWorkflows(@Query('app') app?: string) {
-    return this.queryBus.execute(new GetPendingTasksQuery(app));
+  listWorkflows(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query('app') app?: string,
+  ) {
+    return this.queryBus.execute(new GetPendingTasksQuery(user.roles, app));
   }
 
   @Get(':processId/:instanceId')
@@ -90,12 +92,13 @@ export class WorkflowController {
     @Param('processId') processId: string,
     @Param('instanceId') instanceId: string,
     @Body() dto: CancelWorkflowDto,
+    @CurrentUser() user: AuthenticatedUser,
   ) {
     return this.commandBus.execute(
       new CancelWorkflowCommand(
         instanceId,
         processId,
-        dto.cancelledById,
+        user.keycloakId,
         dto.reason,
       ),
     );
