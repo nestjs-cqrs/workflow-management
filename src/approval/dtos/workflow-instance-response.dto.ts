@@ -22,9 +22,9 @@ export class WorkflowInstanceResponseDto {
   processId!: string;
 
   @ApiProperty({
-    description: '1=ACTIVE, 2=COMPLETED, 3=ABORTED, 4=SUSPENDED, 5=PENDING, 6=ERROR',
+    description: 'ACTIVE, COMPLETED, ABORTED, SUSPENDED, PENDING, ERROR',
   })
-  state!: number;
+  state!: string;
 
   @ApiProperty({ description: 'Workflow variables', type: Object })
   variables!: Record<string, unknown>;

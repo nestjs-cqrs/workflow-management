@@ -17,7 +17,7 @@ export class GetPendingTasksHandler
 
     if (query.app) {
       const processInstances = await this.kogitoApi.listInstances(query.app);
-      instances = processInstances.filter((i) => i.state === 1);
+      instances = processInstances.filter((i) => i.state === 'ACTIVE');
     } else {
       instances = await this.kogitoApi.listAllActiveInstances();
     }

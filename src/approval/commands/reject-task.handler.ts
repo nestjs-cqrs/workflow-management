@@ -27,7 +27,7 @@ export class RejectTaskHandler implements ICommandHandler<RejectTaskCommand> {
       );
     }
 
-    if (instance.state !== 1) {
+    if (instance.state !== 'ACTIVE') {
       return Result.conflict(
         `Workflow instance ${command.processInstanceId} is not active (state: ${instance.state})`,
       );

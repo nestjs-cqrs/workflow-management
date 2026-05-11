@@ -6,6 +6,7 @@ import { ApproveTaskHandler } from './commands/approve-task.handler';
 import { RejectTaskHandler } from './commands/reject-task.handler';
 import { CancelWorkflowHandler } from './commands/cancel-workflow.handler';
 import { GetPendingTasksHandler } from './queries/get-pending-tasks.handler';
+import { GetActiveWorkflowsHandler } from './queries/get-active-workflows.handler';
 import { GetWorkflowInstanceHandler } from './queries/get-workflow-instance.handler';
 import { KogitoEventService } from './services/kogito-event.service';
 import { KogitoApiService } from './services/kogito-api.service';
@@ -16,7 +17,7 @@ const CommandHandlers = [
   CancelWorkflowHandler,
 ];
 
-const QueryHandlers = [GetPendingTasksHandler, GetWorkflowInstanceHandler];
+const QueryHandlers = [GetPendingTasksHandler, GetActiveWorkflowsHandler, GetWorkflowInstanceHandler];
 
 @Module({
   imports: [CqrsModule],

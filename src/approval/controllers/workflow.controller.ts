@@ -12,9 +12,8 @@ import {
 } from '@nestjs/swagger';
 import { CancelWorkflowCommand } from '../commands/cancel-workflow.command';
 import { GetWorkflowInstanceQuery } from '../queries/get-workflow-instance.query';
-import { GetPendingTasksQuery } from '../queries/get-pending-tasks.query';
+import { GetActiveWorkflowsQuery } from '../queries/get-active-workflows.query';
 import { WorkflowInstanceResponseDto } from '../dtos/workflow-instance-response.dto';
-import { PendingTaskResponseDto } from '../dtos/pending-task-response.dto';
 import {
   CurrentUser,
   AuthenticatedUser,
@@ -42,12 +41,9 @@ export class WorkflowController {
     required: false,
     description: 'Filter by process definition ID',
   })
-  @ApiResponse({ status: 200, type: [PendingTaskResponseDto] })
-  listWorkflows(
-    @CurrentUser() user: AuthenticatedUser,
-    @Query('app') app?: string,
-  ) {
-    return this.queryBus.execute(new GetPendingTasksQuery(user.roles, app));
+  @ApiResponse({ status: 200 })
+  listWorkflows(@Query('app') app?: string) {
+    return this.queryBus.execute(new GetActiveWorkflowsQuery(app));
   }
 
   @Get(':processId/:instanceId')

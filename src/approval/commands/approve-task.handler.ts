@@ -27,7 +27,7 @@ export class ApproveTaskHandler implements ICommandHandler<ApproveTaskCommand> {
       );
     }
 
-    if (instance.state !== 1) {
+    if (instance.state !== 'ACTIVE') {
       return Result.conflict(
         `Workflow instance ${command.processInstanceId} is not active (state: ${instance.state})`,
       );

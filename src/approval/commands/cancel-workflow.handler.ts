@@ -26,8 +26,7 @@ export class CancelWorkflowHandler
       );
     }
 
-    // state 2=COMPLETED, 3=ABORTED
-    if (instance.state === 2 || instance.state === 3) {
+    if (instance.state === 'COMPLETED' || instance.state === 'ABORTED') {
       return Result.conflict(
         `Workflow instance ${command.processInstanceId} is already terminated (state: ${instance.state})`,
       );

@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { PassportModule } from '@nestjs/passport';
 import { LoggerModule } from 'nestjs-pino';
-import { createPinoConfig, JwtAuthGuard, JwtStrategy } from '@turkelk/nestjs-cqrs-kernel';
+import { createPinoConfig, JwtAuthGuard, JwtStrategy, ResultInterceptor } from '@turkelk/nestjs-cqrs-kernel';
 import { BffModule } from './bff/bff.module';
 import { ApprovalModule } from './approval/approval.module';
+import { ResultUnwrapInterceptor } from './shared/interceptors/result-unwrap.interceptor';
 
 @Module({
   imports: [
@@ -20,6 +21,14 @@ import { ApprovalModule } from './approval/approval.module';
     {
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResultUnwrapInterceptor,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ResultInterceptor,
     },
   ],
 })
