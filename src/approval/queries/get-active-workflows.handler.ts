@@ -41,7 +41,8 @@ export class GetActiveWorkflowsHandler
       );
 
       const currentState = waitingNode?.name
-        ?? activeNodes.find((n) => n.type === 'EventNode')?.name
+        ?? activeNodes.find((n) => n.name.match(/^(GenerateStep|WaitGenStep|WaitApprovalStep|EvalStep|RejectStep)\d/))?.name
+        ?? activeNodes[0]?.name
         ?? 'unknown';
 
       const requiredRole =

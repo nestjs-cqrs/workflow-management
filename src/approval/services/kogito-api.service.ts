@@ -75,11 +75,15 @@ export class KogitoApiService {
     };
   }
 
-  async listInstances(processId: string): Promise<KogitoProcessInstance[]> {
+  async listInstances(
+    processId: string,
+    state?: string,
+  ): Promise<KogitoProcessInstance[]> {
+    const stateFilter = state ? `, state: { equal: ${state} }` : '';
     const data = await this.graphql<{
       ProcessInstances: RawGraphQLInstance[];
     }>(
-      `{ ProcessInstances(where: { processId: { equal: "${processId}" } }) { ${this.instanceFields} } }`,
+      `{ ProcessInstances(where: { processId: { equal: "${processId}" }${stateFilter} }) { ${this.instanceFields} } }`,
     );
     return data.ProcessInstances.map((i) => this.mapInstance(i));
   }
@@ -135,13 +139,11 @@ export class KogitoApiService {
 
     for (const processId of processIds) {
       try {
-        const instances = await this.listInstances(processId);
-        allInstances.push(
-          ...instances.filter((i) => i.state === 'ACTIVE'),
-        );
-      } catch {
+        const instances = await this.listInstances(processId, 'ACTIVE');
+        allInstances.push(...instances);
+      } catch (err) {
         this.logger.warn(
-          { processId },
+          { processId, error: err instanceof Error ? err.message : String(err) },
           'Failed to fetch instances for process',
         );
       }
