@@ -1,44 +1,41 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import { Result } from '@turkelk/nestjs-cqrs-kernel';
-import { WorkflowInstance, WorkflowStatus } from '@turkelk/nestjs-cqrs-workflow';
 import { ApproveTaskCommand } from './approve-task.command';
 import { KogitoEventService } from '../services/kogito-event.service';
+import { KogitoApiService } from '../services/kogito-api.service';
 
 @CommandHandler(ApproveTaskCommand)
 export class ApproveTaskHandler implements ICommandHandler<ApproveTaskCommand> {
   private readonly logger = new Logger(ApproveTaskHandler.name);
 
   constructor(
-    @InjectRepository(WorkflowInstance)
-    private readonly workflowInstanceRepo: Repository<WorkflowInstance>,
     private readonly kogitoEventService: KogitoEventService,
+    private readonly kogitoApi: KogitoApiService,
   ) {}
 
   async execute(command: ApproveTaskCommand): Promise<Result<void>> {
-    const workflowInstance = await this.workflowInstanceRepo.findOne({
-      where: { id: command.workflowInstanceId },
-    });
-
-    if (!workflowInstance) {
+    // Verify the instance exists and is active in Kogito
+    let instance;
+    try {
+      instance = await this.kogitoApi.getInstance(
+        command.processId,
+        command.processInstanceId,
+      );
+    } catch {
       return Result.notFound(
-        `Workflow instance ${command.workflowInstanceId} not found`,
+        `Workflow instance ${command.processInstanceId} not found in Kogito`,
       );
     }
 
-    if (
-      workflowInstance.status !== WorkflowStatus.STARTED &&
-      workflowInstance.status !== WorkflowStatus.IN_PROGRESS
-    ) {
+    if (instance.state !== 1) {
       return Result.conflict(
-        `Workflow instance ${command.workflowInstanceId} is not in a pending state (current: ${workflowInstance.status})`,
+        `Workflow instance ${command.processInstanceId} is not active (state: ${instance.state})`,
       );
     }
 
     await this.kogitoEventService.publishApprovalDecision(
-      workflowInstance.processInstanceId,
+      command.processInstanceId,
       {
         approved: true,
         approvedById: command.approvedById,
@@ -49,7 +46,8 @@ export class ApproveTaskHandler implements ICommandHandler<ApproveTaskCommand> {
 
     this.logger.log({
       msg: 'Task approved',
-      workflowInstanceId: command.workflowInstanceId,
+      processInstanceId: command.processInstanceId,
+      processId: command.processId,
       approvedById: command.approvedById,
       role: command.role,
     });

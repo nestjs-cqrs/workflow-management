@@ -1,3 +1,6 @@
 export class GetWorkflowInstanceQuery {
-  constructor(public readonly id: string) {}
+  constructor(
+    public readonly processId: string,
+    public readonly instanceId: string,
+  ) {}
 }

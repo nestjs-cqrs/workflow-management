@@ -1,43 +1,43 @@
 import { QueryHandler, IQueryHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Result } from '@turkelk/nestjs-cqrs-kernel';
-import { WorkflowInstance } from '@turkelk/nestjs-cqrs-workflow';
 import { GetWorkflowInstanceQuery } from './get-workflow-instance.query';
 import { WorkflowInstanceResponseDto } from '../dtos/workflow-instance-response.dto';
+import { KogitoApiService } from '../services/kogito-api.service';
 
 @QueryHandler(GetWorkflowInstanceQuery)
 export class GetWorkflowInstanceHandler
   implements IQueryHandler<GetWorkflowInstanceQuery>
 {
-  constructor(
-    @InjectRepository(WorkflowInstance)
-    private readonly workflowInstanceRepo: Repository<WorkflowInstance>,
-  ) {}
+  constructor(private readonly kogitoApi: KogitoApiService) {}
 
   async execute(
     query: GetWorkflowInstanceQuery,
   ): Promise<Result<WorkflowInstanceResponseDto>> {
-    const instance = await this.workflowInstanceRepo.findOne({
-      where: { id: query.id },
-    });
-
-    if (!instance) {
-      return Result.notFound(`Workflow instance ${query.id} not found`);
+    let instance;
+    try {
+      instance = await this.kogitoApi.getInstance(
+        query.processId,
+        query.instanceId,
+      );
+    } catch {
+      return Result.notFound(
+        `Workflow instance ${query.instanceId} not found in Kogito`,
+      );
     }
 
     const dto: WorkflowInstanceResponseDto = {
       id: instance.id,
-      processDefinitionId: instance.processDefinitionId,
-      processInstanceId: instance.processInstanceId,
-      commandType: instance.commandType,
-      commandPayload: instance.commandPayload,
-      status: instance.status,
-      correlationId: instance.correlationId,
-      processVariables: instance.processVariables,
-      createdAt: instance.createdAt,
-      updatedAt: instance.updatedAt,
-      completedAt: instance.completedAt,
+      processId: instance.processId,
+      state: instance.state,
+      variables: instance.variables ?? {},
+      nodes: (instance.nodes ?? []).map((n) => ({
+        name: n.name,
+        type: n.type,
+        enter: n.enter,
+        exit: n.exit,
+      })),
+      start: instance.start ?? '',
+      end: instance.end,
     };
 
     return Result.success(dto);

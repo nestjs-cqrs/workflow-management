@@ -1,37 +1,46 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { WorkflowStatus } from '@turkelk/nestjs-cqrs-workflow';
+
+export class NodeInstanceDto {
+  @ApiProperty({ description: 'Node name' })
+  name!: string;
+
+  @ApiProperty({ description: 'Node type' })
+  type!: string;
+
+  @ApiProperty({ description: 'When the node was entered' })
+  enter!: string;
+
+  @ApiProperty({ description: 'When the node was exited', nullable: true })
+  exit?: string;
+}
 
 export class WorkflowInstanceResponseDto {
-  @ApiProperty({ description: 'Workflow instance ID' })
+  @ApiProperty({ description: 'Kogito process instance ID' })
   id!: string;
 
   @ApiProperty({ description: 'Kogito process definition ID' })
-  processDefinitionId!: string;
+  processId!: string;
 
-  @ApiProperty({ description: 'Kogito process instance ID' })
-  processInstanceId!: string;
+  @ApiProperty({
+    description: '1=ACTIVE, 2=COMPLETED, 3=ABORTED, 4=SUSPENDED, 5=PENDING, 6=ERROR',
+  })
+  state!: number;
 
-  @ApiProperty({ description: 'Command type that initiated the workflow' })
-  commandType!: string;
+  @ApiProperty({ description: 'Workflow variables', type: Object })
+  variables!: Record<string, unknown>;
 
-  @ApiProperty({ description: 'Original command payload', type: Object })
-  commandPayload!: Record<string, unknown>;
+  @ApiProperty({
+    description: 'Node execution history',
+    type: [NodeInstanceDto],
+  })
+  nodes!: NodeInstanceDto[];
 
-  @ApiProperty({ description: 'Current workflow status', enum: WorkflowStatus })
-  status!: WorkflowStatus;
+  @ApiProperty({ description: 'When the workflow instance started' })
+  start!: string;
 
-  @ApiProperty({ description: 'Correlation ID for tracing' })
-  correlationId!: string;
-
-  @ApiProperty({ description: 'Process variables from Kogito', type: Object, nullable: true })
-  processVariables!: Record<string, unknown> | null;
-
-  @ApiProperty({ description: 'When the workflow was created' })
-  createdAt!: Date;
-
-  @ApiProperty({ description: 'When the workflow was last updated' })
-  updatedAt!: Date;
-
-  @ApiProperty({ description: 'When the workflow completed', nullable: true })
-  completedAt!: Date | null;
+  @ApiProperty({
+    description: 'When the workflow instance ended',
+    nullable: true,
+  })
+  end?: string;
 }

@@ -2,6 +2,11 @@ import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsNotEmpty } from 'class-validator';
 
 export class RejectTaskDto {
+  @ApiProperty({ description: 'Kogito process definition ID' })
+  @IsString()
+  @IsNotEmpty()
+  processId!: string;
+
   @ApiProperty({ description: 'ID of the user rejecting the task' })
   @IsString()
   @IsNotEmpty()

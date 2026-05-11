@@ -1,14 +1,8 @@
 import { CommandHandler, ICommandHandler } from '@nestjs/cqrs';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
 import { Logger } from '@nestjs/common';
 import { Result } from '@turkelk/nestjs-cqrs-kernel';
-import {
-  WorkflowInstance,
-  WorkflowStatus,
-  KogitoClient,
-} from '@turkelk/nestjs-cqrs-workflow';
 import { CancelWorkflowCommand } from './cancel-workflow.command';
+import { KogitoApiService } from '../services/kogito-api.service';
 
 @CommandHandler(CancelWorkflowCommand)
 export class CancelWorkflowHandler
@@ -16,44 +10,38 @@ export class CancelWorkflowHandler
 {
   private readonly logger = new Logger(CancelWorkflowHandler.name);
 
-  constructor(
-    @InjectRepository(WorkflowInstance)
-    private readonly workflowInstanceRepo: Repository<WorkflowInstance>,
-    private readonly kogitoClient: KogitoClient,
-  ) {}
+  constructor(private readonly kogitoApi: KogitoApiService) {}
 
   async execute(command: CancelWorkflowCommand): Promise<Result<void>> {
-    const workflowInstance = await this.workflowInstanceRepo.findOne({
-      where: { id: command.workflowInstanceId },
-    });
-
-    if (!workflowInstance) {
+    // Verify the instance exists and check its state
+    let instance;
+    try {
+      instance = await this.kogitoApi.getInstance(
+        command.processId,
+        command.processInstanceId,
+      );
+    } catch {
       return Result.notFound(
-        `Workflow instance ${command.workflowInstanceId} not found`,
+        `Workflow instance ${command.processInstanceId} not found in Kogito`,
       );
     }
 
-    if (
-      workflowInstance.status === WorkflowStatus.COMPLETED ||
-      workflowInstance.status === WorkflowStatus.ABORTED
-    ) {
+    // state 2=COMPLETED, 3=ABORTED
+    if (instance.state === 2 || instance.state === 3) {
       return Result.conflict(
-        `Workflow instance ${command.workflowInstanceId} is already ${workflowInstance.status}`,
+        `Workflow instance ${command.processInstanceId} is already terminated (state: ${instance.state})`,
       );
     }
 
-    await this.kogitoClient.abortProcess(
-      workflowInstance.processDefinitionId,
-      workflowInstance.processInstanceId,
+    await this.kogitoApi.abortInstance(
+      command.processId,
+      command.processInstanceId,
     );
-
-    workflowInstance.status = WorkflowStatus.ABORTED;
-    workflowInstance.completedAt = new Date();
-    await this.workflowInstanceRepo.save(workflowInstance);
 
     this.logger.log({
       msg: 'Workflow cancelled',
-      workflowInstanceId: command.workflowInstanceId,
+      processInstanceId: command.processInstanceId,
+      processId: command.processId,
       cancelledById: command.cancelledById,
       reason: command.reason,
     });

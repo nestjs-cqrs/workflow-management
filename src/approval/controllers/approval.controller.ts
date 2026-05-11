@@ -27,26 +27,33 @@ export class ApprovalController {
   @ApiQuery({
     name: 'app',
     required: false,
-    description: 'Filter by source application (process definition ID)',
+    description: 'Filter by process definition ID',
   })
   @ApiResponse({ status: 200, type: [PendingTaskResponseDto] })
   getPendingTasks(@Query('app') app?: string) {
     return this.queryBus.execute(new GetPendingTasksQuery(app));
   }
 
-  @Post(':workflowInstanceId/approve')
+  @Post(':processInstanceId/approve')
   @ApiOperation({ summary: 'Approve a pending task' })
-  @ApiParam({ name: 'workflowInstanceId', description: 'Workflow instance ID' })
+  @ApiParam({
+    name: 'processInstanceId',
+    description: 'Kogito process instance ID',
+  })
   @ApiResponse({ status: 200, description: 'Task approved successfully' })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
-  @ApiResponse({ status: 409, description: 'Workflow instance is not in a pending state' })
+  @ApiResponse({
+    status: 409,
+    description: 'Workflow instance is not in an active state',
+  })
   approveTask(
-    @Param('workflowInstanceId') workflowInstanceId: string,
+    @Param('processInstanceId') processInstanceId: string,
     @Body() dto: ApproveTaskDto,
   ) {
     return this.commandBus.execute(
       new ApproveTaskCommand(
-        workflowInstanceId,
+        processInstanceId,
+        dto.processId,
         dto.approvedById,
         dto.role,
         dto.comment,
@@ -54,19 +61,26 @@ export class ApprovalController {
     );
   }
 
-  @Post(':workflowInstanceId/reject')
+  @Post(':processInstanceId/reject')
   @ApiOperation({ summary: 'Reject a pending task with feedback' })
-  @ApiParam({ name: 'workflowInstanceId', description: 'Workflow instance ID' })
+  @ApiParam({
+    name: 'processInstanceId',
+    description: 'Kogito process instance ID',
+  })
   @ApiResponse({ status: 200, description: 'Task rejected successfully' })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
-  @ApiResponse({ status: 409, description: 'Workflow instance is not in a pending state' })
+  @ApiResponse({
+    status: 409,
+    description: 'Workflow instance is not in an active state',
+  })
   rejectTask(
-    @Param('workflowInstanceId') workflowInstanceId: string,
+    @Param('processInstanceId') processInstanceId: string,
     @Body() dto: RejectTaskDto,
   ) {
     return this.commandBus.execute(
       new RejectTaskCommand(
-        workflowInstanceId,
+        processInstanceId,
+        dto.processId,
         dto.rejectedById,
         dto.role,
         dto.feedback,

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 import {
@@ -8,6 +8,7 @@ import {
   ApiParam,
   ApiBody,
   ApiProperty,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { CancelWorkflowCommand } from '../commands/cancel-workflow.command';
 import { GetWorkflowInstanceQuery } from '../queries/get-workflow-instance.query';
@@ -36,34 +37,67 @@ export class WorkflowController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all workflow instances' })
+  @ApiOperation({ summary: 'List all active workflow instances' })
+  @ApiQuery({
+    name: 'app',
+    required: false,
+    description: 'Filter by process definition ID',
+  })
   @ApiResponse({ status: 200, type: [PendingTaskResponseDto] })
-  listWorkflows() {
-    return this.queryBus.execute(new GetPendingTasksQuery());
+  listWorkflows(@Query('app') app?: string) {
+    return this.queryBus.execute(new GetPendingTasksQuery(app));
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get workflow instance detail' })
-  @ApiParam({ name: 'id', description: 'Workflow instance ID' })
+  @Get(':processId/:instanceId')
+  @ApiOperation({ summary: 'Get workflow instance detail from Kogito' })
+  @ApiParam({
+    name: 'processId',
+    description: 'Kogito process definition ID',
+  })
+  @ApiParam({
+    name: 'instanceId',
+    description: 'Kogito process instance ID',
+  })
   @ApiResponse({ status: 200, type: WorkflowInstanceResponseDto })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
-  getWorkflowInstance(@Param('id') id: string) {
-    return this.queryBus.execute(new GetWorkflowInstanceQuery(id));
+  getWorkflowInstance(
+    @Param('processId') processId: string,
+    @Param('instanceId') instanceId: string,
+  ) {
+    return this.queryBus.execute(
+      new GetWorkflowInstanceQuery(processId, instanceId),
+    );
   }
 
-  @Post(':id/cancel')
+  @Post(':processId/:instanceId/cancel')
   @ApiOperation({ summary: 'Cancel/abort a workflow instance' })
-  @ApiParam({ name: 'id', description: 'Workflow instance ID' })
+  @ApiParam({
+    name: 'processId',
+    description: 'Kogito process definition ID',
+  })
+  @ApiParam({
+    name: 'instanceId',
+    description: 'Kogito process instance ID',
+  })
   @ApiBody({ type: CancelWorkflowDto })
   @ApiResponse({ status: 200, description: 'Workflow cancelled successfully' })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
-  @ApiResponse({ status: 409, description: 'Workflow instance is already completed or aborted' })
+  @ApiResponse({
+    status: 409,
+    description: 'Workflow instance is already completed or aborted',
+  })
   cancelWorkflow(
-    @Param('id') id: string,
+    @Param('processId') processId: string,
+    @Param('instanceId') instanceId: string,
     @Body() dto: CancelWorkflowDto,
   ) {
     return this.commandBus.execute(
-      new CancelWorkflowCommand(id, dto.cancelledById, dto.reason),
+      new CancelWorkflowCommand(
+        instanceId,
+        processId,
+        dto.cancelledById,
+        dto.reason,
+      ),
     );
   }
 }
