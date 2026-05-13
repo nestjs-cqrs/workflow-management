@@ -99,6 +99,67 @@ export interface PendingTask {
   requiredRole: string
   variables: Record<string, unknown>
   startedAt: string
+  stepNumber: number
+  stepLabel: string
+  workflowDisplayName: string
+  highlightedVariables: Record<string, string>
+  nodeCount: number
+}
+
+export interface VariableFieldConfig {
+  key: string
+  label: string
+  group: string
+  isMarkdown?: boolean
+  isHidden?: boolean
+  isHighlighted?: boolean
+}
+
+export interface WorkflowTypeConfig {
+  processId: string
+  displayName: string
+  description: string
+  approvalNodePattern: string
+  variableSchema: VariableFieldConfig[]
+  stepLabels: Record<string, string>
+  variableGroups: Record<string, string>
+}
+
+export interface TimelineNode {
+  name: string
+  type: string
+  enter: string
+  exit?: string
+}
+
+export interface TimelineStep {
+  stepNumber: number
+  label: string
+  status: 'completed' | 'active' | 'pending'
+  enterTime?: string
+  exitTime?: string
+  durationMs?: number
+  detail?: string
+  feedback?: string
+  nodes: TimelineNode[]
+}
+
+export interface TaskReviewTask {
+  processInstanceId: string
+  processId: string
+  currentState: string
+  requiredRole: string
+  stepNumber: number
+  stepLabel: string
+  variables: Record<string, unknown>
+  startedAt: string
+  isActive: boolean
+}
+
+export interface TaskReviewResponse {
+  task: TaskReviewTask
+  timeline: TimelineStep[]
+  workflowConfig?: WorkflowTypeConfig
 }
 
 export interface WorkflowInstance {

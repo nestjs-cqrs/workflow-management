@@ -43,7 +43,8 @@ export class ApproveTaskHandler implements ICommandHandler<ApproveTaskCommand> {
     }
 
     const requiredRole = waitingNode.name.split('_').pop()?.toLowerCase();
-    if (!requiredRole || !command.userRoles.includes(requiredRole)) {
+    const isAdmin = command.userRoles.includes('admin');
+    if (!requiredRole || (!isAdmin && !command.userRoles.includes(requiredRole))) {
       return Result.forbidden(
         `Role '${requiredRole}' is required to approve this step`,
       );

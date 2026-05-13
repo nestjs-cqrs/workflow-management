@@ -8,6 +8,7 @@ const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const PendingApprovalsPage = lazy(() => import('@/pages/PendingApprovalsPage'))
 const WorkflowsPage = lazy(() => import('@/pages/WorkflowsPage'))
 const WorkflowDetailPage = lazy(() => import('@/pages/WorkflowDetailPage'))
+const TaskReviewPage = lazy(() => import('@/pages/TaskReviewPage'))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -41,6 +42,10 @@ export default function App() {
               }
             >
               <Route index element={<PendingApprovalsPage />} />
+              <Route
+                path="approvals/:processId/:instanceId/review"
+                element={<TaskReviewPage />}
+              />
               <Route path="workflows" element={<WorkflowsPage />} />
               <Route
                 path="workflows/:processId/:instanceId"

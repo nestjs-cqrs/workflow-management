@@ -8,8 +8,10 @@ import { CancelWorkflowHandler } from './commands/cancel-workflow.handler';
 import { GetPendingTasksHandler } from './queries/get-pending-tasks.handler';
 import { GetActiveWorkflowsHandler } from './queries/get-active-workflows.handler';
 import { GetWorkflowInstanceHandler } from './queries/get-workflow-instance.handler';
+import { GetTaskReviewHandler } from './queries/get-task-review.handler';
 import { KogitoEventService } from './services/kogito-event.service';
 import { KogitoApiService } from './services/kogito-api.service';
+import { WorkflowRegistryModule } from '../workflow-registry/workflow-registry.module';
 
 const CommandHandlers = [
   ApproveTaskHandler,
@@ -17,10 +19,10 @@ const CommandHandlers = [
   CancelWorkflowHandler,
 ];
 
-const QueryHandlers = [GetPendingTasksHandler, GetActiveWorkflowsHandler, GetWorkflowInstanceHandler];
+const QueryHandlers = [GetPendingTasksHandler, GetActiveWorkflowsHandler, GetWorkflowInstanceHandler, GetTaskReviewHandler];
 
 @Module({
-  imports: [CqrsModule],
+  imports: [CqrsModule, WorkflowRegistryModule],
   controllers: [ApprovalController, WorkflowController],
   providers: [
     ...CommandHandlers,

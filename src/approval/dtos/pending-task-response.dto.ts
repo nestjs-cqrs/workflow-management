@@ -25,4 +25,19 @@ export class PendingTaskResponseDto {
 
   @ApiProperty({ description: 'When the workflow instance started' })
   startedAt!: string;
+
+  @ApiProperty({ description: 'Parsed step number from approval node name' })
+  stepNumber!: number;
+
+  @ApiProperty({ description: 'Human-readable step label from registry or fallback' })
+  stepLabel!: string;
+
+  @ApiProperty({ description: 'Workflow display name from registry or processId fallback' })
+  workflowDisplayName!: string;
+
+  @ApiProperty({ description: 'Registry-configured highlighted variable values', type: Object })
+  highlightedVariables!: Record<string, string>;
+
+  @ApiProperty({ description: 'Total node count indicating workflow progress' })
+  nodeCount!: number;
 }

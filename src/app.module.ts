@@ -6,6 +6,7 @@ import { LoggerModule } from 'nestjs-pino';
 import { createPinoConfig, JwtAuthGuard, JwtStrategy, ResultInterceptor } from '@turkelk/nestjs-cqrs-kernel';
 import { BffModule } from './bff/bff.module';
 import { ApprovalModule } from './approval/approval.module';
+import { WorkflowRegistryModule } from './workflow-registry/workflow-registry.module';
 import { ResultUnwrapInterceptor } from './shared/interceptors/result-unwrap.interceptor';
 
 @Module({
@@ -15,6 +16,7 @@ import { ResultUnwrapInterceptor } from './shared/interceptors/result-unwrap.int
     PassportModule.register({ defaultStrategy: 'jwt' }),
     BffModule,
     ApprovalModule,
+    WorkflowRegistryModule,
   ],
   providers: [
     JwtStrategy,

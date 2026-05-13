@@ -3,12 +3,16 @@ import { Result } from '@turkelk/nestjs-cqrs-kernel';
 import { GetPendingTasksQuery } from './get-pending-tasks.query';
 import { PendingTaskResponseDto } from '../dtos/pending-task-response.dto';
 import { KogitoApiService } from '../services/kogito-api.service';
+import { WorkflowRegistryService } from '../../workflow-registry/workflow-registry.service';
 
 @QueryHandler(GetPendingTasksQuery)
 export class GetPendingTasksHandler
   implements IQueryHandler<GetPendingTasksQuery>
 {
-  constructor(private readonly kogitoApi: KogitoApiService) {}
+  constructor(
+    private readonly kogitoApi: KogitoApiService,
+    private readonly registry: WorkflowRegistryService,
+  ) {}
 
   async execute(
     query: GetPendingTasksQuery,
@@ -39,14 +43,24 @@ export class GetPendingTasksHandler
         const requiredRole =
           waitingNode.name.split('_').pop()?.toLowerCase() ?? '';
 
-        if (query.userRoles.includes(requiredRole)) {
+        const isAdmin = query.userRoles.includes('admin');
+        if (isAdmin || query.userRoles.includes(requiredRole)) {
+          const stepMatch = waitingNode.name.match(/WaitApprovalStep(\d+)/);
+          const stepNumber = stepMatch ? parseInt(stepMatch[1]!, 10) : 0;
+          const variables = detail.variables ?? {};
+
           tasks.push({
             processInstanceId: instance.id,
             processId: instance.processId,
             currentState: waitingNode.name,
             requiredRole,
-            variables: detail.variables ?? {},
+            variables,
             startedAt: instance.start ?? '',
+            stepNumber,
+            stepLabel: this.registry.getStepLabel(instance.processId, stepNumber),
+            workflowDisplayName: this.registry.getDisplayName(instance.processId),
+            highlightedVariables: this.registry.getHighlightedVariables(instance.processId, variables),
+            nodeCount: detail.nodes?.length ?? 0,
           });
         }
       }

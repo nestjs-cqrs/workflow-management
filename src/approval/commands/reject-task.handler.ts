@@ -43,7 +43,8 @@ export class RejectTaskHandler implements ICommandHandler<RejectTaskCommand> {
     }
 
     const requiredRole = waitingNode.name.split('_').pop()?.toLowerCase();
-    if (!requiredRole || !command.userRoles.includes(requiredRole)) {
+    const isAdmin = command.userRoles.includes('admin');
+    if (!requiredRole || (!isAdmin && !command.userRoles.includes(requiredRole))) {
       return Result.forbidden(
         `Role '${requiredRole}' is required to reject this step`,
       );

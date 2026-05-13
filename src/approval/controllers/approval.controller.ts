@@ -10,9 +10,11 @@ import {
 import { ApproveTaskCommand } from '../commands/approve-task.command';
 import { RejectTaskCommand } from '../commands/reject-task.command';
 import { GetPendingTasksQuery } from '../queries/get-pending-tasks.query';
+import { GetTaskReviewQuery } from '../queries/get-task-review.query';
 import { ApproveTaskDto } from '../dtos/approve-task.dto';
 import { RejectTaskDto } from '../dtos/reject-task.dto';
 import { PendingTaskResponseDto } from '../dtos/pending-task-response.dto';
+import { TaskReviewResponseDto } from '../dtos/task-review-response.dto';
 import {
   CurrentUser,
   AuthenticatedUser,
@@ -39,6 +41,29 @@ export class ApprovalController {
     @Query('app') app?: string,
   ) {
     return this.queryBus.execute(new GetPendingTasksQuery(user.roles, app));
+  }
+
+  @Get(':processInstanceId/review')
+  @ApiOperation({ summary: 'Get full context for task review page' })
+  @ApiParam({
+    name: 'processInstanceId',
+    description: 'Kogito process instance ID',
+  })
+  @ApiQuery({
+    name: 'processId',
+    required: true,
+    description: 'Kogito process definition ID',
+  })
+  @ApiResponse({ status: 200, type: TaskReviewResponseDto })
+  @ApiResponse({ status: 404, description: 'Workflow instance not found' })
+  getTaskReview(
+    @Param('processInstanceId') processInstanceId: string,
+    @Query('processId') processId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.queryBus.execute(
+      new GetTaskReviewQuery(processInstanceId, processId, user.roles),
+    );
   }
 
   @Post(':processInstanceId/approve')
