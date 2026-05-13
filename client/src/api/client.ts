@@ -115,6 +115,14 @@ export interface VariableFieldConfig {
   isHighlighted?: boolean
 }
 
+export interface ReviewSectionConfig {
+  type: 'fields' | 'artifact' | 'timeline'
+  title: string
+  groups?: string[]
+  sourceVariable?: string
+  collapsed?: boolean
+}
+
 export interface WorkflowTypeConfig {
   processId: string
   displayName: string
@@ -123,6 +131,7 @@ export interface WorkflowTypeConfig {
   variableSchema: VariableFieldConfig[]
   stepLabels: Record<string, string>
   variableGroups: Record<string, string>
+  reviewLayout?: ReviewSectionConfig[]
 }
 
 export interface TimelineNode {

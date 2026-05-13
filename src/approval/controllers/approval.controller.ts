@@ -11,6 +11,7 @@ import { ApproveTaskCommand } from '../commands/approve-task.command';
 import { RejectTaskCommand } from '../commands/reject-task.command';
 import { GetPendingTasksQuery } from '../queries/get-pending-tasks.query';
 import { GetTaskReviewQuery } from '../queries/get-task-review.query';
+import { GetStepOutputQuery } from '../queries/get-step-output.query';
 import { ApproveTaskDto } from '../dtos/approve-task.dto';
 import { RejectTaskDto } from '../dtos/reject-task.dto';
 import { PendingTaskResponseDto } from '../dtos/pending-task-response.dto';
@@ -41,6 +42,19 @@ export class ApprovalController {
     @Query('app') app?: string,
   ) {
     return this.queryBus.execute(new GetPendingTasksQuery(user.roles, app));
+  }
+
+  @Get('step-output')
+  @ApiOperation({ summary: 'Fetch step output content from MinIO' })
+  @ApiQuery({
+    name: 'path',
+    required: true,
+    description: 'MinIO object key for the step output',
+  })
+  @ApiResponse({ status: 200, description: 'Step output content (markdown)' })
+  @ApiResponse({ status: 404, description: 'Step output not found' })
+  getStepOutput(@Query('path') path: string) {
+    return this.queryBus.execute(new GetStepOutputQuery(path));
   }
 
   @Get(':processInstanceId/review')

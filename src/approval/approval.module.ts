@@ -9,8 +9,10 @@ import { GetPendingTasksHandler } from './queries/get-pending-tasks.handler';
 import { GetActiveWorkflowsHandler } from './queries/get-active-workflows.handler';
 import { GetWorkflowInstanceHandler } from './queries/get-workflow-instance.handler';
 import { GetTaskReviewHandler } from './queries/get-task-review.handler';
+import { GetStepOutputHandler } from './queries/get-step-output.handler';
 import { KogitoEventService } from './services/kogito-event.service';
 import { KogitoApiService } from './services/kogito-api.service';
+import { MinioStorageService } from './services/minio-storage.service';
 import { WorkflowRegistryModule } from '../workflow-registry/workflow-registry.module';
 
 const CommandHandlers = [
@@ -24,6 +26,7 @@ const QueryHandlers = [
   GetActiveWorkflowsHandler,
   GetWorkflowInstanceHandler,
   GetTaskReviewHandler,
+  GetStepOutputHandler,
 ];
 
 @Module({
@@ -34,6 +37,7 @@ const QueryHandlers = [
     ...QueryHandlers,
     KogitoEventService,
     KogitoApiService,
+    MinioStorageService,
   ],
 })
 export class ApprovalModule {}

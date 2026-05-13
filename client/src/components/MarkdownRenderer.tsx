@@ -20,6 +20,7 @@ export function MarkdownRenderer({ content, maxHeight = 300 }: MarkdownRendererP
             'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
             'strong', 'em', 'ul', 'ol', 'li', 'code', 'pre',
             'a', 'blockquote', 'hr', 'br',
+            'table', 'thead', 'tbody', 'tr', 'th', 'td',
           ]}
         >
           {content}

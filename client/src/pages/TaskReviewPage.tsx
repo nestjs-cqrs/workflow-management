@@ -1,19 +1,29 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api, type TaskReviewResponse } from '@/api/client'
+import {
+  api,
+  type TaskReviewResponse,
+  type ReviewSectionConfig,
+  type VariableFieldConfig,
+  type TimelineStep,
+} from '@/api/client'
+import { useWorkflowRegistry } from '@/hooks/useWorkflowRegistry'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import {
-  ArrowLeft,
   CheckCircle2,
   Circle,
   Clock,
   Copy,
   Check,
   AlertTriangle,
+  FileText,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react'
 
 function CopyButton({ value }: { value: string }) {
@@ -52,89 +62,43 @@ function formatDuration(ms: number): string {
   return rem > 0 ? `${hours}h ${rem}m` : `${hours}h`
 }
 
-export default function TaskReviewPage() {
-  const { processId, instanceId } = useParams<{
-    processId: string
-    instanceId: string
-  }>()
-  const navigate = useNavigate()
-  const queryClient = useQueryClient()
-  const [showRejectForm, setShowRejectForm] = useState(false)
-  const [feedback, setFeedback] = useState('')
-  const [approveComment, setApproveComment] = useState('')
+interface FieldsSectionProps {
+  title: string
+  groups?: string[]
+  collapsed?: boolean
+  variables: Record<string, unknown>
+  variableSchema: VariableFieldConfig[]
+  variableGroups: Record<string, string>
+}
 
-  const { data, isLoading, error } = useQuery<TaskReviewResponse>({
-    queryKey: ['approvals', 'review', instanceId],
-    queryFn: () =>
-      api.get(`/approvals/${instanceId}/review?processId=${processId}`),
-    enabled: !!processId && !!instanceId,
-    refetchInterval: 15000,
-  })
+function FieldsSection({
+  title,
+  groups,
+  collapsed: initialCollapsed,
+  variables,
+  variableSchema,
+  variableGroups,
+}: FieldsSectionProps) {
+  const [collapsed, setCollapsed] = useState(initialCollapsed ?? false)
 
-  const approveMutation = useMutation({
-    mutationFn: () =>
-      api.post(`/approvals/${instanceId}/approve`, {
-        processId,
-        comment: approveComment || undefined,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['approvals'] })
-      navigate('/')
-    },
-  })
-
-  const rejectMutation = useMutation({
-    mutationFn: () =>
-      api.post(`/approvals/${instanceId}/reject`, {
-        processId,
-        feedback,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['approvals'] })
-      navigate('/')
-    },
-  })
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-      </div>
-    )
-  }
-
-  if (error || !data) {
-    return (
-      <div>
-        <Button variant="ghost" className="mb-4" onClick={() => navigate('/')}>
-          <ArrowLeft className="h-4 w-4" /> Back
-        </Button>
-        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive-foreground">
-          {error instanceof Error ? error.message : 'Task not found'}
-        </div>
-      </div>
-    )
-  }
-
-  const { task, timeline, workflowConfig } = data
-  const isActive = task.isActive
-
-  const variableGroups = workflowConfig?.variableGroups ?? {}
-  const variableSchema = workflowConfig?.variableSchema ?? []
   const schemaMap = new Map(variableSchema.map((f) => [f.key, f]))
-  const allVarKeys = Object.keys(task.variables)
+  const allVarKeys = Object.keys(variables)
 
-  const grouped = new Map<string, Array<{ key: string; label: string; value: unknown; isMarkdown: boolean }>>()
+  const grouped = new Map<
+    string,
+    Array<{ key: string; label: string; value: unknown; isMarkdown: boolean }>
+  >()
   const ungroupedVars: Array<{ key: string; value: unknown }> = []
 
   for (const key of allVarKeys) {
-    const value = task.variables[key]
+    const value = variables[key]
     if (value === null || value === undefined) continue
 
     const field = schemaMap.get(key)
     if (field?.isHidden) continue
 
     if (field) {
+      if (groups && !groups.includes(field.group)) continue
       const groupKey = field.group
       const existing = grouped.get(groupKey) ?? []
       existing.push({
@@ -144,73 +108,32 @@ export default function TaskReviewPage() {
         isMarkdown: field.isMarkdown ?? false,
       })
       grouped.set(groupKey, existing)
-    } else {
+    } else if (!groups) {
       ungroupedVars.push({ key, value })
     }
   }
 
+  const hasContent = grouped.size > 0 || ungroupedVars.length > 0
+
   return (
-    <div className="pb-28">
-      {/* Breadcrumb */}
-      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
-        <button className="hover:text-foreground" onClick={() => navigate('/')}>
-          Pending Approvals
+    <Card className="mb-4">
+      <CardHeader>
+        <button
+          className="flex w-full items-center gap-2 text-left"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0" />
+          )}
+          <CardTitle className="text-base">{title}</CardTitle>
         </button>
-        <span>/</span>
-        <span>{workflowConfig?.displayName ?? task.processId}</span>
-        <span>/</span>
-        <span>
-          Step {task.stepNumber}: {task.stepLabel}
-        </span>
-      </div>
-
-      {/* Already handled banner */}
-      {!isActive && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/50 bg-warning/10 p-4 text-warning-foreground">
-          <AlertTriangle className="h-5 w-5" />
-          <span>This task has already been handled by another user.</span>
-        </div>
-      )}
-
-      {/* Header card */}
-      <Card className="mb-4">
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div>
-              <CardTitle className="text-lg">
-                {workflowConfig?.displayName ?? task.processId}
-              </CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Step {task.stepNumber}: {task.stepLabel}
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="uppercase">
-                {task.requiredRole}
-              </Badge>
-              <Badge variant="secondary">
-                <Clock className="mr-1 h-3 w-3" />
-                {formatTimeAgo(task.startedAt)}
-              </Badge>
-            </div>
-          </div>
-          <div className="mt-2 flex items-center text-xs text-muted-foreground">
-            <span className="font-mono">{task.processInstanceId}</span>
-            <CopyButton value={task.processInstanceId} />
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Variables card */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Workflow Data</CardTitle>
-        </CardHeader>
+      </CardHeader>
+      {!collapsed && (
         <CardContent>
-          {allVarKeys.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No workflow data available
-            </p>
+          {!hasContent ? (
+            <p className="text-sm text-muted-foreground">No data available</p>
           ) : (
             <div className="space-y-6">
               {Array.from(grouped.entries()).map(([groupKey, fields]) => (
@@ -276,13 +199,95 @@ export default function TaskReviewPage() {
             </div>
           )}
         </CardContent>
-      </Card>
+      )}
+    </Card>
+  )
+}
 
-      {/* Timeline card */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">Step Timeline</CardTitle>
-        </CardHeader>
+interface ArtifactSectionProps {
+  title: string
+  objectKey: string
+  collapsed?: boolean
+}
+
+function ArtifactSection({
+  title,
+  objectKey,
+  collapsed: initialCollapsed,
+}: ArtifactSectionProps) {
+  const [collapsed, setCollapsed] = useState(initialCollapsed ?? false)
+
+  const { data, isLoading, error } = useQuery<string>({
+    queryKey: ['approvals', 'step-output', objectKey],
+    queryFn: () =>
+      api.get(`/approvals/step-output?path=${encodeURIComponent(objectKey)}`),
+  })
+
+  return (
+    <Card className="mb-4">
+      <CardHeader>
+        <button
+          className="flex w-full items-center gap-2 text-left"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0" />
+          )}
+          <FileText className="h-4 w-4 shrink-0" />
+          <CardTitle className="text-base">{title}</CardTitle>
+        </button>
+      </CardHeader>
+      {!collapsed && (
+        <CardContent>
+          {isLoading && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Loading...
+            </div>
+          )}
+          {error && (
+            <p className="text-sm text-muted-foreground">
+              Content could not be loaded
+            </p>
+          )}
+          {data && <MarkdownRenderer content={data} maxHeight={600} />}
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
+interface TimelineSectionProps {
+  title: string
+  timeline: TimelineStep[]
+  collapsed?: boolean
+}
+
+function TimelineSection({
+  title,
+  timeline,
+  collapsed: initialCollapsed,
+}: TimelineSectionProps) {
+  const [collapsed, setCollapsed] = useState(initialCollapsed ?? false)
+
+  return (
+    <Card className="mb-4">
+      <CardHeader>
+        <button
+          className="flex w-full items-center gap-2 text-left"
+          onClick={() => setCollapsed(!collapsed)}
+        >
+          {collapsed ? (
+            <ChevronRight className="h-4 w-4 shrink-0" />
+          ) : (
+            <ChevronDown className="h-4 w-4 shrink-0" />
+          )}
+          <CardTitle className="text-base">{title}</CardTitle>
+        </button>
+      </CardHeader>
+      {!collapsed && (
         <CardContent>
           <div className="space-y-2">
             {timeline.map((step) => (
@@ -336,7 +341,184 @@ export default function TaskReviewPage() {
             ))}
           </div>
         </CardContent>
+      )}
+    </Card>
+  )
+}
+
+const DEFAULT_LAYOUT: ReviewSectionConfig[] = [
+  { type: 'fields', title: 'Workflow Data' },
+  { type: 'timeline', title: 'Step Timeline' },
+]
+
+export default function TaskReviewPage() {
+  const { processId, instanceId } = useParams<{
+    processId: string
+    instanceId: string
+  }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const [showRejectForm, setShowRejectForm] = useState(false)
+  const [feedback, setFeedback] = useState('')
+  const [approveComment, setApproveComment] = useState('')
+  const { getByProcessId } = useWorkflowRegistry()
+
+  const { data, isLoading, error } = useQuery<TaskReviewResponse>({
+    queryKey: ['approvals', 'review', instanceId],
+    queryFn: () =>
+      api.get(`/approvals/${instanceId}/review?processId=${processId}`),
+    enabled: !!processId && !!instanceId,
+    refetchInterval: 15000,
+  })
+
+  const approveMutation = useMutation({
+    mutationFn: () =>
+      api.post(`/approvals/${instanceId}/approve`, {
+        processId,
+        comment: approveComment || undefined,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['approvals'] })
+      navigate('/')
+    },
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: () =>
+      api.post(`/approvals/${instanceId}/reject`, {
+        processId,
+        feedback,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['approvals'] })
+      navigate('/')
+    },
+  })
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
+    )
+  }
+
+  if (error || !data) {
+    return (
+      <div>
+        <Button variant="ghost" className="mb-4" onClick={() => navigate('/')}>
+          Back
+        </Button>
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-destructive-foreground">
+          {error instanceof Error ? error.message : 'Task not found'}
+        </div>
+      </div>
+    )
+  }
+
+  const { task, timeline } = data
+  const isActive = task.isActive
+  const registryConfig = getByProcessId(task.processId)
+  const layout = registryConfig?.reviewLayout ?? DEFAULT_LAYOUT
+  const variableSchema = registryConfig?.variableSchema ?? []
+  const variableGroups = registryConfig?.variableGroups ?? {}
+
+  return (
+    <div className="pb-28">
+      {/* Breadcrumb */}
+      <div className="mb-4 flex items-center gap-2 text-sm text-muted-foreground">
+        <button className="hover:text-foreground" onClick={() => navigate('/')}>
+          Pending Approvals
+        </button>
+        <span>/</span>
+        <span>{registryConfig?.displayName ?? task.processId}</span>
+        <span>/</span>
+        <span>
+          Step {task.stepNumber}: {task.stepLabel}
+        </span>
+      </div>
+
+      {/* Already handled banner */}
+      {!isActive && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-warning/50 bg-warning/10 p-4 text-warning-foreground">
+          <AlertTriangle className="h-5 w-5" />
+          <span>This task has already been handled by another user.</span>
+        </div>
+      )}
+
+      {/* Header card */}
+      <Card className="mb-4">
+        <CardHeader>
+          <div className="flex items-start justify-between">
+            <div>
+              <CardTitle className="text-lg">
+                {registryConfig?.displayName ?? task.processId}
+              </CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Step {task.stepNumber}: {task.stepLabel}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Badge variant="outline" className="uppercase">
+                {task.requiredRole}
+              </Badge>
+              <Badge variant="secondary">
+                <Clock className="mr-1 h-3 w-3" />
+                {formatTimeAgo(task.startedAt)}
+              </Badge>
+            </div>
+          </div>
+          <div className="mt-2 flex items-center text-xs text-muted-foreground">
+            <span className="font-mono">{task.processInstanceId}</span>
+            <CopyButton value={task.processInstanceId} />
+          </div>
+        </CardHeader>
       </Card>
+
+      {/* Dynamic sections from reviewLayout */}
+      {layout.map((section, idx) => {
+        const key = `${section.type}-${idx}`
+
+        if (section.type === 'fields') {
+          return (
+            <FieldsSection
+              key={key}
+              title={section.title}
+              groups={section.groups}
+              collapsed={section.collapsed}
+              variables={task.variables}
+              variableSchema={variableSchema}
+              variableGroups={variableGroups}
+            />
+          )
+        }
+
+        if (section.type === 'artifact' && section.sourceVariable) {
+          const objectKey = task.variables[section.sourceVariable]
+          if (typeof objectKey !== 'string' || !objectKey) return null
+          return (
+            <ArtifactSection
+              key={key}
+              title={section.title}
+              objectKey={objectKey}
+              collapsed={section.collapsed}
+            />
+          )
+        }
+
+        if (section.type === 'timeline') {
+          return (
+            <TimelineSection
+              key={key}
+              title={section.title}
+              timeline={timeline}
+              collapsed={section.collapsed}
+            />
+          )
+        }
+
+        return null
+      })}
 
       {/* Sticky action bar */}
       {isActive && (

@@ -45,7 +45,15 @@ export class GetTaskReviewHandler implements IQueryHandler<GetTaskReviewQuery> {
     const isActive = stepStatus === 'awaiting_approval';
     const currentState = `WaitApprovalStep${stepNumber}_${requiredRole.toUpperCase()}`;
 
-    const timeline = this.buildTimeline(vars, instance.processId, stepNumber);
+    const totalSteps = config
+      ? Object.keys(config.stepLabels).length
+      : stepNumber;
+    const timeline = this.buildTimeline(
+      vars,
+      instance.processId,
+      stepNumber,
+      totalSteps,
+    );
 
     return Result.success({
       task: {
@@ -68,8 +76,8 @@ export class GetTaskReviewHandler implements IQueryHandler<GetTaskReviewQuery> {
     variables: Record<string, unknown>,
     processId: string,
     currentStep: number,
+    totalSteps: number,
   ): TimelineStepDto[] {
-    const totalSteps = 8;
     const steps: TimelineStepDto[] = [];
 
     for (let s = 1; s <= totalSteps; s++) {

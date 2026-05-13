@@ -7,6 +7,14 @@ export interface VariableFieldConfig {
   isHighlighted?: boolean;
 }
 
+export interface ReviewSectionConfig {
+  type: 'fields' | 'artifact' | 'timeline';
+  title: string;
+  groups?: string[];
+  sourceVariable?: string;
+  collapsed?: boolean;
+}
+
 export interface WorkflowTypeConfig {
   processId: string;
   displayName: string;
@@ -15,6 +23,7 @@ export interface WorkflowTypeConfig {
   variableSchema: VariableFieldConfig[];
   stepLabels: Record<number, string>;
   variableGroups: Record<string, string>;
+  reviewLayout?: ReviewSectionConfig[];
 }
 
 export const WORKFLOW_REGISTRY: WorkflowTypeConfig[] = [
@@ -39,6 +48,28 @@ export const WORKFLOW_REGISTRY: WorkflowTypeConfig[] = [
       execution: 'Execution State',
       feedback: 'Feedback & History',
     },
+    reviewLayout: [
+      {
+        type: 'fields',
+        title: 'Workflow Data',
+        groups: ['identity', 'context', 'execution'],
+      },
+      {
+        type: 'artifact',
+        title: 'Step Output',
+        sourceVariable: 'stepOutputPath',
+      },
+      {
+        type: 'fields',
+        title: 'Feedback History',
+        groups: ['feedback'],
+        collapsed: true,
+      },
+      {
+        type: 'timeline',
+        title: 'Step Timeline',
+      },
+    ],
     variableSchema: [
       {
         key: 'planningRunId',
