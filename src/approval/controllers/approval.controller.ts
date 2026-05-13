@@ -73,7 +73,10 @@ export class ApprovalController {
     description: 'Kogito process instance ID',
   })
   @ApiResponse({ status: 200, description: 'Task approved successfully' })
-  @ApiResponse({ status: 403, description: 'User does not have the required role' })
+  @ApiResponse({
+    status: 403,
+    description: 'User does not have the required role',
+  })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
   @ApiResponse({
     status: 409,
@@ -102,7 +105,10 @@ export class ApprovalController {
     description: 'Kogito process instance ID',
   })
   @ApiResponse({ status: 200, description: 'Task rejected successfully' })
-  @ApiResponse({ status: 403, description: 'User does not have the required role' })
+  @ApiResponse({
+    status: 403,
+    description: 'User does not have the required role',
+  })
   @ApiResponse({ status: 404, description: 'Workflow instance not found' })
   @ApiResponse({
     status: 409,

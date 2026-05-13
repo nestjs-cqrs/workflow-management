@@ -130,6 +130,11 @@ export const WORKFLOW_REGISTRY: WorkflowTypeConfig[] = [
         group: 'execution',
         isHidden: true,
       },
+      { key: 'moreApprovals', label: '', group: 'execution', isHidden: true },
+      { key: 'approved', label: '', group: 'execution', isHidden: true },
+      { key: 'totalApprovals', label: '', group: 'execution', isHidden: true },
+      { key: 'approvalIndex', label: '', group: 'execution', isHidden: true },
+      { key: 'moreSteps', label: '', group: 'execution', isHidden: true },
     ],
   },
 ];

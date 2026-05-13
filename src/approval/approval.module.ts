@@ -19,7 +19,12 @@ const CommandHandlers = [
   CancelWorkflowHandler,
 ];
 
-const QueryHandlers = [GetPendingTasksHandler, GetActiveWorkflowsHandler, GetWorkflowInstanceHandler, GetTaskReviewHandler];
+const QueryHandlers = [
+  GetPendingTasksHandler,
+  GetActiveWorkflowsHandler,
+  GetWorkflowInstanceHandler,
+  GetTaskReviewHandler,
+];
 
 @Module({
   imports: [CqrsModule, WorkflowRegistryModule],

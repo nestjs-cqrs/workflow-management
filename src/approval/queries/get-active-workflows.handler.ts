@@ -14,9 +14,7 @@ export interface ActiveWorkflowDto {
 }
 
 @QueryHandler(GetActiveWorkflowsQuery)
-export class GetActiveWorkflowsHandler
-  implements IQueryHandler<GetActiveWorkflowsQuery>
-{
+export class GetActiveWorkflowsHandler implements IQueryHandler<GetActiveWorkflowsQuery> {
   constructor(private readonly kogitoApi: KogitoApiService) {}
 
   async execute(
@@ -25,8 +23,7 @@ export class GetActiveWorkflowsHandler
     let instances;
 
     if (query.app) {
-      const processInstances = await this.kogitoApi.listInstances(query.app);
-      instances = processInstances.filter((i) => i.state === 'ACTIVE');
+      instances = await this.kogitoApi.listInstances(query.app);
     } else {
       instances = await this.kogitoApi.listAllActiveInstances();
     }
@@ -34,19 +31,20 @@ export class GetActiveWorkflowsHandler
     const workflows: ActiveWorkflowDto[] = [];
 
     for (const instance of instances) {
-      const activeNodes =
-        instance.nodes?.filter((n) => !n.exit) ?? [];
-      const waitingNode = activeNodes.find((n) =>
-        n.name.startsWith('WaitApproval'),
-      );
-
-      const currentState = waitingNode?.name
-        ?? activeNodes.find((n) => n.name.match(/^(GenerateStep|WaitGenStep|WaitApprovalStep|EvalStep|RejectStep)\d/))?.name
-        ?? activeNodes[0]?.name
-        ?? 'unknown';
-
+      const vars = instance.variables;
+      const stepStatus = (vars['stepStatus'] as string) ?? 'unknown';
       const requiredRole =
-        waitingNode?.name.split('_').pop()?.toLowerCase() ?? '';
+        (vars['requiredRole'] as string | undefined)?.toLowerCase() ?? '';
+      const rawStep = vars['stepNumber'];
+      const stepNumber =
+        typeof rawStep === 'number' || typeof rawStep === 'string'
+          ? rawStep
+          : '';
+
+      const currentState =
+        stepStatus === 'awaiting_approval'
+          ? `WaitApprovalStep${stepNumber}_${requiredRole.toUpperCase()}`
+          : stepStatus;
 
       workflows.push({
         processInstanceId: instance.id,
@@ -54,7 +52,7 @@ export class GetActiveWorkflowsHandler
         processName: instance.processName ?? instance.processId,
         currentState,
         requiredRole,
-        variables: instance.variables ?? {},
+        variables: vars,
         startedAt: instance.start ?? '',
       });
     }

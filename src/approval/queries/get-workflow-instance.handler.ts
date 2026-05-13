@@ -5,9 +5,7 @@ import { WorkflowInstanceResponseDto } from '../dtos/workflow-instance-response.
 import { KogitoApiService } from '../services/kogito-api.service';
 
 @QueryHandler(GetWorkflowInstanceQuery)
-export class GetWorkflowInstanceHandler
-  implements IQueryHandler<GetWorkflowInstanceQuery>
-{
+export class GetWorkflowInstanceHandler implements IQueryHandler<GetWorkflowInstanceQuery> {
   constructor(private readonly kogitoApi: KogitoApiService) {}
 
   async execute(
@@ -29,13 +27,8 @@ export class GetWorkflowInstanceHandler
       id: instance.id,
       processId: instance.processId,
       state: instance.state,
-      variables: instance.variables ?? {},
-      nodes: (instance.nodes ?? []).map((n) => ({
-        name: n.name,
-        type: n.type,
-        enter: n.enter,
-        exit: n.exit,
-      })),
+      variables: instance.variables,
+      nodes: [],
       start: instance.start ?? '',
       end: instance.end,
     };

@@ -5,9 +5,7 @@ import { CancelWorkflowCommand } from './cancel-workflow.command';
 import { KogitoApiService } from '../services/kogito-api.service';
 
 @CommandHandler(CancelWorkflowCommand)
-export class CancelWorkflowHandler
-  implements ICommandHandler<CancelWorkflowCommand>
-{
+export class CancelWorkflowHandler implements ICommandHandler<CancelWorkflowCommand> {
   private readonly logger = new Logger(CancelWorkflowHandler.name);
 
   constructor(private readonly kogitoApi: KogitoApiService) {}

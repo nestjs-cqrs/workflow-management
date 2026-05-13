@@ -27,24 +27,22 @@ export class RejectTaskHandler implements ICommandHandler<RejectTaskCommand> {
       );
     }
 
-    if (instance.state !== 'ACTIVE') {
+    const vars = instance.variables;
+    const stepStatus = vars['stepStatus'] as string | undefined;
+
+    if (stepStatus !== 'awaiting_approval') {
       return Result.conflict(
-        `Workflow instance ${command.processInstanceId} is not active (state: ${instance.state})`,
+        'No pending approval found for this workflow instance',
       );
     }
 
-    const activeNodes = instance.nodes?.filter((n: { exit?: string }) => !n.exit) ?? [];
-    const waitingNode = activeNodes.find((n: { name: string }) =>
-      n.name.startsWith('WaitApproval'),
-    );
-
-    if (!waitingNode) {
-      return Result.conflict('No pending approval found for this workflow instance');
-    }
-
-    const requiredRole = waitingNode.name.split('_').pop()?.toLowerCase();
+    const requiredRole =
+      (vars['requiredRole'] as string | undefined)?.toLowerCase() ?? '';
     const isAdmin = command.userRoles.includes('admin');
-    if (!requiredRole || (!isAdmin && !command.userRoles.includes(requiredRole))) {
+    if (
+      !requiredRole ||
+      (!isAdmin && !command.userRoles.includes(requiredRole))
+    ) {
       return Result.forbidden(
         `Role '${requiredRole}' is required to reject this step`,
       );

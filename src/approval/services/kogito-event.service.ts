@@ -8,7 +8,10 @@ export class KogitoEventService {
   private readonly kogitoUrl: string;
 
   constructor(private readonly config: ConfigService) {
-    this.kogitoUrl = this.config.get<string>('KOGITO_URL', 'http://localhost:8180');
+    this.kogitoUrl = this.config.get<string>(
+      'KOGITO_URL',
+      'http://localhost:8180',
+    );
   }
 
   async publishApprovalDecision(

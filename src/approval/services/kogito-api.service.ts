@@ -6,7 +6,7 @@ export interface KogitoProcessInstance {
   processId: string;
   processName?: string;
   state: string;
-  variables?: Record<string, unknown>;
+  variables: Record<string, unknown>;
   start?: string;
   end?: string;
   nodes?: KogitoNodeInstance[];
@@ -30,9 +30,10 @@ export interface KogitoTask {
   parameters?: Record<string, unknown>;
 }
 
-type RawGraphQLInstance = Omit<KogitoProcessInstance, 'variables'> & {
-  variables?: unknown;
-};
+interface KogitoRestInstance {
+  id: string;
+  [key: string]: unknown;
+}
 
 @Injectable()
 export class KogitoApiService {
@@ -46,32 +47,18 @@ export class KogitoApiService {
     );
   }
 
-  private async graphql<T>(query: string): Promise<T> {
-    const response = await fetch(`${this.baseUrl}/graphql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-    });
-    if (!response.ok) {
-      throw new Error(`Kogito GraphQL error: ${response.status}`);
-    }
-    const result = (await response.json()) as { data: T; errors?: unknown[] };
-    if (result.errors?.length) {
-      throw new Error(
-        `Kogito GraphQL error: ${JSON.stringify(result.errors)}`,
-      );
-    }
-    return result.data;
-  }
+  private mapRestInstance(
+    raw: KogitoRestInstance,
+    processId: string,
+  ): KogitoProcessInstance {
+    const { id, ...variables } = raw;
+    const stepStatus = variables['stepStatus'] as string | undefined;
 
-  private readonly instanceFields =
-    'id processId processName state start end variables nodes { id name type enter exit definitionId }';
-
-  private mapInstance(raw: RawGraphQLInstance): KogitoProcessInstance {
-    const vars = (raw.variables as Record<string, unknown>) ?? {};
     return {
-      ...raw,
-      variables: (vars['workflowdata'] as Record<string, unknown>) ?? vars,
+      id: String(id),
+      processId,
+      state: stepStatus === 'completed' ? 'COMPLETED' : 'ACTIVE',
+      variables,
     };
   }
 
@@ -79,28 +66,30 @@ export class KogitoApiService {
     processId: string,
     state?: string,
   ): Promise<KogitoProcessInstance[]> {
-    const stateFilter = state ? `, state: { equal: ${state} }` : '';
-    const data = await this.graphql<{
-      ProcessInstances: RawGraphQLInstance[];
-    }>(
-      `{ ProcessInstances(where: { processId: { equal: "${processId}" }${stateFilter} }) { ${this.instanceFields} } }`,
-    );
-    return data.ProcessInstances.map((i) => this.mapInstance(i));
+    const response = await fetch(`${this.baseUrl}/${processId}`);
+    if (!response.ok) {
+      throw new Error(`Kogito REST error: ${response.status}`);
+    }
+    const rawList = (await response.json()) as KogitoRestInstance[];
+    let instances = rawList.map((r) => this.mapRestInstance(r, processId));
+
+    if (state) {
+      instances = instances.filter((i) => i.state === state);
+    }
+
+    return instances;
   }
 
   async getInstance(
     processId: string,
     instanceId: string,
   ): Promise<KogitoProcessInstance> {
-    const data = await this.graphql<{
-      ProcessInstances: RawGraphQLInstance[];
-    }>(
-      `{ ProcessInstances(where: { id: { equal: "${instanceId}" } }) { ${this.instanceFields} } }`,
-    );
-    if (!data.ProcessInstances.length) {
+    const response = await fetch(`${this.baseUrl}/${processId}/${instanceId}`);
+    if (!response.ok) {
       throw new Error(`Instance ${instanceId} not found`);
     }
-    return this.mapInstance(data.ProcessInstances[0]);
+    const raw = (await response.json()) as KogitoRestInstance;
+    return this.mapRestInstance(raw, processId);
   }
 
   async getInstanceTasks(
@@ -116,14 +105,10 @@ export class KogitoApiService {
     return response.json() as Promise<KogitoTask[]>;
   }
 
-  async abortInstance(
-    processId: string,
-    instanceId: string,
-  ): Promise<void> {
-    const response = await fetch(
-      `${this.baseUrl}/${processId}/${instanceId}`,
-      { method: 'DELETE' },
-    );
+  async abortInstance(processId: string, instanceId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/${processId}/${instanceId}`, {
+      method: 'DELETE',
+    });
     if (!response.ok) {
       throw new Error(`Kogito abort failed: ${response.status}`);
     }
@@ -131,7 +116,7 @@ export class KogitoApiService {
 
   async listAllActiveInstances(): Promise<KogitoProcessInstance[]> {
     const processIds = this.config
-      .get<string>('KOGITO_PROCESS_IDS', 'pipeline_orchestrator')
+      .get<string>('KOGITO_PROCESS_IDS', 'ProjectPlanningOrchestrator')
       .split(',')
       .map((id) => id.trim());
 
@@ -139,11 +124,14 @@ export class KogitoApiService {
 
     for (const processId of processIds) {
       try {
-        const instances = await this.listInstances(processId, 'ACTIVE');
+        const instances = await this.listInstances(processId);
         allInstances.push(...instances);
       } catch (err) {
         this.logger.warn(
-          { processId, error: err instanceof Error ? err.message : String(err) },
+          {
+            processId,
+            error: err instanceof Error ? err.message : String(err),
+          },
           'Failed to fetch instances for process',
         );
       }

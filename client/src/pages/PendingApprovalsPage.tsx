@@ -8,7 +8,10 @@ import { Badge } from '@/components/ui/badge'
 import { CheckCircle2, Clock, ChevronRight, X } from 'lucide-react'
 
 function formatTimeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
+  if (!dateStr) return 'unknown'
+  const time = new Date(dateStr).getTime()
+  if (isNaN(time)) return 'unknown'
+  const diff = Date.now() - time
   const hours = Math.floor(diff / 3600000)
   if (hours < 1) return 'less than an hour ago'
   if (hours < 24) return `${hours}h ago`

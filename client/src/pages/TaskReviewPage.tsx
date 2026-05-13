@@ -33,7 +33,10 @@ function CopyButton({ value }: { value: string }) {
 }
 
 function formatTimeAgo(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime()
+  if (!dateStr) return 'unknown'
+  const time = new Date(dateStr).getTime()
+  if (isNaN(time)) return 'unknown'
+  const diff = Date.now() - time
   const hours = Math.floor(diff / 3600000)
   if (hours < 1) return 'less than an hour ago'
   if (hours < 24) return `${hours}h ago`
@@ -125,6 +128,9 @@ export default function TaskReviewPage() {
   const ungroupedVars: Array<{ key: string; value: unknown }> = []
 
   for (const key of allVarKeys) {
+    const value = task.variables[key]
+    if (value === null || value === undefined) continue
+
     const field = schemaMap.get(key)
     if (field?.isHidden) continue
 
@@ -134,12 +140,12 @@ export default function TaskReviewPage() {
       existing.push({
         key,
         label: field.label,
-        value: task.variables[key],
+        value,
         isMarkdown: field.isMarkdown ?? false,
       })
       grouped.set(groupKey, existing)
     } else {
-      ungroupedVars.push({ key, value: task.variables[key] })
+      ungroupedVars.push({ key, value })
     }
   }
 

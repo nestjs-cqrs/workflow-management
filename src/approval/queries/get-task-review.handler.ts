@@ -5,10 +5,7 @@ import {
   TaskReviewResponseDto,
   TimelineStepDto,
 } from '../dtos/task-review-response.dto';
-import {
-  KogitoApiService,
-  KogitoNodeInstance,
-} from '../services/kogito-api.service';
+import { KogitoApiService } from '../services/kogito-api.service';
 import { WorkflowRegistryService } from '../../workflow-registry/workflow-registry.service';
 
 @QueryHandler(GetTaskReviewQuery)
@@ -33,58 +30,22 @@ export class GetTaskReviewHandler implements IQueryHandler<GetTaskReviewQuery> {
       );
     }
 
-    const nodes = instance.nodes ?? [];
-    const activeNodes = nodes.filter((n) => !n.exit);
-    const waitingNode = activeNodes.find((n) =>
-      n.name.startsWith('WaitApproval'),
-    );
+    const vars = instance.variables;
+    const stepStatus = vars['stepStatus'] as string | undefined;
+    const requiredRole =
+      (vars['requiredRole'] as string | undefined)?.toLowerCase() ?? '';
+    const stepNumber = this.parseStepNumber(vars);
 
     const config = this.registry.getByProcessId(instance.processId);
-    const pattern = config?.approvalNodePattern
-      ? new RegExp(config.approvalNodePattern)
-      : /WaitApprovalStep(\d+)_(\w+)/;
-
-    let stepNumber = 0;
-    let requiredRole = '';
-    let currentState = '';
-
-    if (waitingNode) {
-      currentState = waitingNode.name;
-      const match = waitingNode.name.match(pattern);
-      if (match) {
-        stepNumber = parseInt(match[1], 10);
-        requiredRole = (match[2] ?? '').toLowerCase();
-      }
-    } else {
-      const lastApprovalNode = [...nodes]
-        .filter((n) => n.name.startsWith('WaitApproval'))
-        .sort(
-          (a, b) => new Date(b.enter).getTime() - new Date(a.enter).getTime(),
-        )[0];
-      if (lastApprovalNode) {
-        currentState = lastApprovalNode.name;
-        const match = lastApprovalNode.name.match(pattern);
-        if (match) {
-          stepNumber = parseInt(match[1], 10);
-          requiredRole = (match[2] ?? '').toLowerCase();
-        }
-      }
-    }
-
     const stepLabel = this.registry.getStepLabel(
       instance.processId,
       stepNumber,
     );
 
-    const variables = instance.variables ?? {};
-    const timeline = this.buildTimeline(
-      nodes,
-      variables,
-      instance.processId,
-      pattern,
-    );
+    const isActive = stepStatus === 'awaiting_approval';
+    const currentState = `WaitApprovalStep${stepNumber}_${requiredRole.toUpperCase()}`;
 
-    const isActive = !!waitingNode && instance.state === 'ACTIVE';
+    const timeline = this.buildTimeline(vars, instance.processId, stepNumber);
 
     return Result.success({
       task: {
@@ -94,7 +55,7 @@ export class GetTaskReviewHandler implements IQueryHandler<GetTaskReviewQuery> {
         requiredRole,
         stepNumber,
         stepLabel,
-        variables,
+        variables: vars,
         startedAt: instance.start ?? '',
         isActive,
       },
@@ -104,104 +65,71 @@ export class GetTaskReviewHandler implements IQueryHandler<GetTaskReviewQuery> {
   }
 
   private buildTimeline(
-    nodes: KogitoNodeInstance[],
     variables: Record<string, unknown>,
     processId: string,
-    pattern: RegExp,
+    currentStep: number,
   ): TimelineStepDto[] {
-    const sortedNodes = [...nodes].sort(
-      (a, b) => new Date(a.enter).getTime() - new Date(b.enter).getTime(),
-    );
-
-    const stepNodeMap = new Map<number, KogitoNodeInstance[]>();
-    for (const node of sortedNodes) {
-      const match = node.name.match(
-        /(?:GenerateStep|WaitGenStep|WaitApprovalStep|EvalStep|RejectStep)(\d+)/,
-      );
-      if (match) {
-        const num = parseInt(match[1], 10);
-        const existing = stepNodeMap.get(num) ?? [];
-        existing.push(node);
-        stepNodeMap.set(num, existing);
-      }
-    }
-
-    const maxStep = Math.max(...Array.from(stepNodeMap.keys()), 0);
-
-    const totalSteps = Math.max(maxStep, 8);
+    const totalSteps = 8;
     const steps: TimelineStepDto[] = [];
 
     for (let s = 1; s <= totalSteps; s++) {
-      const stepNodes = stepNodeMap.get(s) ?? [];
       const label = this.registry.getStepLabel(processId, s);
-
-      if (stepNodes.length === 0) {
-        steps.push({
-          stepNumber: s,
-          label,
-          status: 'pending',
-          nodes: [],
-        });
-        continue;
-      }
-
-      const activeNode = stepNodes.find((n) => !n.exit);
-      const firstNode = stepNodes[0];
-      const lastNode = stepNodes[stepNodes.length - 1];
-      const enterTime = firstNode.enter;
-      const exitTime = activeNode ? undefined : lastNode.exit;
-      const durationMs =
-        enterTime && exitTime
-          ? new Date(exitTime).getTime() - new Date(enterTime).getTime()
-          : undefined;
-
-      let status: 'completed' | 'active' | 'pending' = 'completed';
-      let detail: string | undefined;
-
-      if (activeNode) {
-        status = 'active';
-        if (activeNode.name.startsWith('WaitApproval')) {
-          const roleMatch = activeNode.name.match(pattern);
-          const role = roleMatch?.[2]?.toUpperCase() ?? '';
-          detail = `Waiting for ${role} approval`;
-        } else if (
-          activeNode.name.startsWith('GenerateStep') ||
-          activeNode.name.startsWith('WaitGenStep')
-        ) {
-          detail = 'Generating';
-        }
-      } else {
-        const rejected = stepNodes.find((n) => n.name.startsWith('RejectStep'));
-        if (rejected) {
-          detail = 'Rejected then approved';
-        } else {
-          detail = 'Approved';
-        }
-      }
-
       const feedbackKey = `step${s}Feedback`;
       const rawFeedback = variables[feedbackKey];
       const feedback =
-        typeof rawFeedback === 'string' ? rawFeedback : undefined;
+        typeof rawFeedback === 'string' && rawFeedback
+          ? rawFeedback
+          : undefined;
+
+      let status: 'completed' | 'active' | 'pending';
+      let detail: string | undefined;
+
+      if (s < currentStep) {
+        status = 'completed';
+        detail = feedback ? 'Rejected then approved' : 'Approved';
+      } else if (s === currentStep) {
+        const stepStatus = variables['stepStatus'] as string | undefined;
+        if (stepStatus === 'awaiting_approval') {
+          status = 'active';
+          const role =
+            (variables['requiredRole'] as string | undefined)?.toUpperCase() ??
+            '';
+          detail = `Waiting for ${role} approval`;
+        } else if (stepStatus === 'generating') {
+          status = 'active';
+          detail = 'Generating';
+        } else {
+          status = 'completed';
+          detail = stepStatus ?? 'Completed';
+        }
+      } else {
+        status = 'pending';
+      }
 
       steps.push({
         stepNumber: s,
         label,
         status,
-        enterTime,
-        exitTime,
-        durationMs,
         detail,
         feedback,
-        nodes: stepNodes.map((n) => ({
-          name: n.name,
-          type: n.type,
-          enter: n.enter,
-          exit: n.exit,
-        })),
+        nodes: [],
       });
     }
 
     return steps;
+  }
+
+  private parseStepNumber(vars: Record<string, unknown>): number {
+    const raw = vars['stepNumber'];
+    if (typeof raw === 'number') return raw;
+    if (typeof raw === 'string') return parseInt(raw, 10) || 0;
+
+    const outputPath = vars['stepOutputPath'];
+    if (typeof outputPath === 'string') {
+      const match = outputPath.match(/step-(\d+)/);
+      if (match) return parseInt(match[1], 10);
+    }
+
+    return 0;
   }
 }
