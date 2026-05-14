@@ -69,8 +69,8 @@ export const api = {
   get: <T>(path: string) => request<T>(`${API_BASE}${path}`),
   post: <T>(path: string, body?: unknown) =>
     request<T>(`${API_BASE}${path}`, { method: 'POST', body: body ? JSON.stringify(body) : undefined }),
-  put: <T>(path: string, body: unknown) =>
-    request<T>(`${API_BASE}${path}`, { method: 'PUT', body: JSON.stringify(body) }),
+  put: <T>(path: string, body: unknown, options?: { headers?: Record<string, string> }) =>
+    request<T>(`${API_BASE}${path}`, { method: 'PUT', body: JSON.stringify(body), headers: options?.headers }),
   delete: <T>(path: string) =>
     request<T>(`${API_BASE}${path}`, { method: 'DELETE' }),
 }
@@ -169,6 +169,37 @@ export interface TaskReviewResponse {
   task: TaskReviewTask
   timeline: TimelineStep[]
   workflowConfig?: WorkflowTypeConfig
+}
+
+export interface FileContentResponse {
+  content: string
+  etag: string
+  versionId: string
+  lastModified: string
+}
+
+export interface FileSaveResponse {
+  path: string
+  versionId: string
+  etag: string
+  lastModified: string
+}
+
+export interface FileVersion {
+  versionId: string
+  lastModified: string
+  size: number
+  isLatest: boolean
+}
+
+export interface FileVersionsResponse {
+  versions: FileVersion[]
+}
+
+export interface FileVersionContent {
+  content: string
+  versionId: string
+  lastModified: string
 }
 
 export interface WorkflowInstance {

@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
+import { MarkdownEditButton } from '@/components/MarkdownEditButton'
 import {
   CheckCircle2,
   Circle,
@@ -208,12 +209,14 @@ interface ArtifactSectionProps {
   title: string
   objectKey: string
   collapsed?: boolean
+  requiredRole?: string
 }
 
 function ArtifactSection({
   title,
   objectKey,
   collapsed: initialCollapsed,
+  requiredRole,
 }: ArtifactSectionProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed ?? false)
 
@@ -237,6 +240,9 @@ function ArtifactSection({
           )}
           <FileText className="h-4 w-4 shrink-0" />
           <CardTitle className="text-base">{title}</CardTitle>
+          <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
+            <MarkdownEditButton filePath={objectKey} requiredRole={requiredRole} />
+          </div>
         </button>
       </CardHeader>
       {!collapsed && (
@@ -502,6 +508,7 @@ export default function TaskReviewPage() {
               title={section.title}
               objectKey={objectKey}
               collapsed={section.collapsed}
+              requiredRole={task.requiredRole}
             />
           )
         }
