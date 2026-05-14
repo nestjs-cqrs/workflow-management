@@ -7,14 +7,24 @@ export class MinioStorageService implements OnModuleInit {
   private readonly logger = new Logger(MinioStorageService.name);
   private readonly client: Client;
   private readonly bucket: string;
+  private readonly publicClient: Client;
 
   constructor(private readonly config: ConfigService) {
-    this.client = new Client({
-      endPoint: this.config.get('MINIO_ENDPOINT', 'localhost'),
-      port: this.config.get<number>('MINIO_PORT', 9000),
-      useSSL: this.config.get('MINIO_USE_SSL', 'false') === 'true',
-      accessKey: this.config.get('MINIO_ACCESS_KEY', 'autoflux'),
-      secretKey: this.config.get('MINIO_SECRET_KEY', 'autoflux123'),
+    const endPoint = this.config.get('MINIO_ENDPOINT', 'localhost');
+    const publicEndpoint = this.config.get('MINIO_PUBLIC_ENDPOINT', 'localhost');
+    const port = this.config.get<number>('MINIO_PORT', 9000);
+    const useSSL = this.config.get('MINIO_USE_SSL', 'false') === 'true';
+    const accessKey = this.config.get('MINIO_ACCESS_KEY', 'autoflux');
+    const secretKey = this.config.get('MINIO_SECRET_KEY', 'autoflux123');
+
+    this.client = new Client({ endPoint, port, useSSL, accessKey, secretKey });
+    this.publicClient = new Client({
+      endPoint: publicEndpoint,
+      port,
+      useSSL,
+      accessKey,
+      secretKey,
+      region: 'us-east-1',
     });
     this.bucket = this.config.get('MINIO_BUCKET', 'autoflux');
   }
@@ -150,6 +160,17 @@ export class MinioStorageService implements OnModuleInit {
       versionId,
       lastModified: stat.lastModified,
     };
+  }
+
+  async presignedGetUrl(
+    key: string,
+    expirySeconds = 300,
+  ): Promise<string> {
+    return this.publicClient.presignedGetObject(
+      this.bucket,
+      key,
+      expirySeconds,
+    );
   }
 
   private async enableBucketVersioning(): Promise<void> {

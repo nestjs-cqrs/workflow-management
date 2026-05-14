@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -14,7 +14,6 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import { MarkdownEditButton } from '@/components/MarkdownEditButton'
-import { StructuredJsonViewer } from '@/components/StructuredJsonViewer'
 import { JsonViewerModal } from '@/components/JsonViewerModal'
 import {
   CheckCircle2,
@@ -215,6 +214,34 @@ interface ArtifactSectionProps {
   requiredRole?: string
 }
 
+function extractJson(text: string): Record<string, unknown> | null {
+  const stripped = text.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '')
+  try {
+    const parsed: unknown = JSON.parse(stripped)
+    if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>
+    }
+  } catch {
+    // not JSON
+  }
+  return null
+}
+
+async function fetchArtifactContent(
+  objectKey: string,
+): Promise<{ content: string; parsedJson: Record<string, unknown> | null }> {
+  const { url } = await api.get<{ url: string }>(
+    `/approvals/step-output?path=${encodeURIComponent(objectKey)}`,
+  )
+  const response = await fetch(url)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch artifact: ${response.status}`)
+  }
+  const text = await response.text()
+  const parsedJson = extractJson(text)
+  return { content: text, parsedJson }
+}
+
 function ArtifactSection({
   title,
   objectKey,
@@ -224,26 +251,14 @@ function ArtifactSection({
   const [collapsed, setCollapsed] = useState(initialCollapsed ?? false)
   const [showJsonModal, setShowJsonModal] = useState(false)
 
-  const { data, isLoading, error } = useQuery<string>({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['approvals', 'step-output', objectKey],
-    queryFn: () =>
-      api.get(`/approvals/step-output?path=${encodeURIComponent(objectKey)}`),
+    queryFn: () => fetchArtifactContent(objectKey),
+    staleTime: 4 * 60 * 1000,
   })
 
-  const parsedJson = useMemo(() => {
-    if (!data) return null
-    try {
-      const parsed: unknown = JSON.parse(data)
-      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
-        return parsed as Record<string, unknown>
-      }
-      return null
-    } catch {
-      return null
-    }
-  }, [data])
-
-  const isJson = parsedJson !== null
+  const parsedJson = data?.parsedJson ?? null
+  const markdownContent = data && !data.parsedJson ? data.content : null
 
   return (
     <Card className="mb-4">
@@ -260,7 +275,7 @@ function ArtifactSection({
           <FileText className="h-4 w-4 shrink-0" />
           <CardTitle className="text-base">{title}</CardTitle>
           <div className="ml-auto flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            {isJson ? (
+            {parsedJson && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -269,7 +284,8 @@ function ArtifactSection({
               >
                 <Eye className="h-3.5 w-3.5" />
               </Button>
-            ) : (
+            )}
+            {markdownContent && (
               <MarkdownEditButton filePath={objectKey} requiredRole={requiredRole} />
             )}
           </div>
@@ -283,17 +299,13 @@ function ArtifactSection({
               Loading...
             </div>
           )}
-          {error && (
+          {isLoading ? null : error && !data ? (
             <p className="text-sm text-muted-foreground">
               Content could not be loaded
             </p>
-          )}
-          {data && isJson && parsedJson && (
-            <StructuredJsonViewer data={parsedJson} maxHeight={600} />
-          )}
-          {data && !isJson && (
-            <MarkdownRenderer content={data} maxHeight={600} />
-          )}
+          ) : markdownContent ? (
+            <MarkdownRenderer content={markdownContent} maxHeight={600} />
+          ) : null}
         </CardContent>
       )}
       {showJsonModal && parsedJson && (
