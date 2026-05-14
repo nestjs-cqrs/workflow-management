@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
@@ -14,6 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { MarkdownRenderer } from '@/components/MarkdownRenderer'
 import { MarkdownEditButton } from '@/components/MarkdownEditButton'
+import { StructuredJsonViewer } from '@/components/StructuredJsonViewer'
+import { JsonViewerModal } from '@/components/JsonViewerModal'
 import {
   CheckCircle2,
   Circle,
@@ -21,6 +23,7 @@ import {
   Copy,
   Check,
   AlertTriangle,
+  Eye,
   FileText,
   Loader2,
   ChevronDown,
@@ -219,12 +222,28 @@ function ArtifactSection({
   requiredRole,
 }: ArtifactSectionProps) {
   const [collapsed, setCollapsed] = useState(initialCollapsed ?? false)
+  const [showJsonModal, setShowJsonModal] = useState(false)
 
   const { data, isLoading, error } = useQuery<string>({
     queryKey: ['approvals', 'step-output', objectKey],
     queryFn: () =>
       api.get(`/approvals/step-output?path=${encodeURIComponent(objectKey)}`),
   })
+
+  const parsedJson = useMemo(() => {
+    if (!data) return null
+    try {
+      const parsed: unknown = JSON.parse(data)
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>
+      }
+      return null
+    } catch {
+      return null
+    }
+  }, [data])
+
+  const isJson = parsedJson !== null
 
   return (
     <Card className="mb-4">
@@ -240,8 +259,19 @@ function ArtifactSection({
           )}
           <FileText className="h-4 w-4 shrink-0" />
           <CardTitle className="text-base">{title}</CardTitle>
-          <div className="ml-auto" onClick={(e) => e.stopPropagation()}>
-            <MarkdownEditButton filePath={objectKey} requiredRole={requiredRole} />
+          <div className="ml-auto flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            {isJson ? (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6"
+                onClick={() => setShowJsonModal(true)}
+              >
+                <Eye className="h-3.5 w-3.5" />
+              </Button>
+            ) : (
+              <MarkdownEditButton filePath={objectKey} requiredRole={requiredRole} />
+            )}
           </div>
         </button>
       </CardHeader>
@@ -258,8 +288,20 @@ function ArtifactSection({
               Content could not be loaded
             </p>
           )}
-          {data && <MarkdownRenderer content={data} maxHeight={600} />}
+          {data && isJson && parsedJson && (
+            <StructuredJsonViewer data={parsedJson} maxHeight={600} />
+          )}
+          {data && !isJson && (
+            <MarkdownRenderer content={data} maxHeight={600} />
+          )}
         </CardContent>
+      )}
+      {showJsonModal && parsedJson && (
+        <JsonViewerModal
+          data={parsedJson}
+          title={title}
+          onClose={() => setShowJsonModal(false)}
+        />
       )}
     </Card>
   )
